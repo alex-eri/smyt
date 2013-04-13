@@ -6,5 +6,11 @@ from django.views.generic import RedirectView
 
 
 urlpatterns = patterns('',
-                       url(r'^$',RedirectView.as_view(url='/')),
+                       url(r'^data.json',Table.as_view(),name='json_table'),
+                       url(r'^(?P<table>.+).json',Table.as_view(),name='json_table'),
+
+                       url(r'^(?P<table>.+)/edit',RowEdit.as_view(),name='edit'),
+
+                       url(r'^$',Home.as_view(),name='home'),
+                       url(r'^(?P<table>.+).html$',Home.as_view(),name='home'),
                        )

@@ -1,0 +1,171 @@
+<!DOCTYPE html>{% load static %}
+<html>
+<head>
+    <title></title>
+    <link  rel="stylesheet" type="text/css" href="{% static 'bootstrap/css/bootstrap.css' %}">
+    <script src="{%static 'js/jquery.min.js'%}"></script>
+</head>
+<body>
+<div class="container">
+    <div class="tabbable tabs-left">
+        <ul class="nav nav-tabs">
+            <li class="disabled"><a href="{% url 'home' %}" >Таблицы</a></li>
+            {% for k,v,f in tables %}
+            <li><a data-toggle="tab" href="{% url 'home' table=k %}" data-target="#{{k}}" data-table="{{k}}">{{v.verbose_name}}</a></li>
+            {% empty %}
+            <li>Таблицы отсутствуют</li>
+            {% endfor %}
+        </ul>
+        <div class="tab-content">
+            {% if not table %}
+            <div class="tab-pane active">
+                <h4>&larr; Выбирайте таблицу</h4>
+            </div>
+            {% endif %}
+            {% for k,v,f in tables %}
+            <div class="tab-pane" id="{{k}}">
+                <h1>{{v.verbose_name}}</h1>
+
+                <table class="table table-bordered" data-model="dynamicbase.{{k}}" data-action="{% url 'edit' table=k %}">
+                    <thead>
+                    <tr>
+                        {% for field in f %}
+                        <th data-field="{{field.name}}">{{field.label}}</th>
+                        {% endfor %}
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+
+                        <tr data-pk=null>
+                            {% for field in f %}
+                        <td data-field="{{field.name}}">
+                            {{field}}
+                        </td>
+                            {% endfor %}
+
+                    </tr>
+
+                    </tfoot>
+                </table>
+              </div>
+            {% empty %}
+            <div><h4>Таблицы отсутствуют</h4></div>
+            {% endfor %}
+            <div><p class="muted text-right">* Сохраняйте строки по enter или двойным щелчком</p></div>
+        </div>
+    </div>
+</div>
+<script src="{%static 'bootstrap/js/bootstrap.min.js'%}"></script>
+<script>
+$(function () {
+
+    function render(data) {
+
+        $('table[data-model] tfoot input').each( function(){
+            $(this).val('');
+        })
+
+        $.each(data,function(i,record){
+            var table = $('table[data-model="'+record.model+'"] tbody');
+
+            var row = $('table[data-model="'+record.model+'"] tbody tr[data-pk="'+record.pk+'"]')
+
+            if (! row[0]){
+                var row = $('table[data-model="'+record.model+'"] tfoot tr')
+                    .clone();
+                row.appendTo(table)
+                        .attr('data-pk',record.pk)
+
+            }
+
+            row.find('input[name="pk"]').val(record.pk);
+
+            $.each(record['fields'],function(k,v){
+                row.find('[data-field="'+k+'"]').html(v);
+            });
+
+
+        })
+    };
+
+    $('a[data-toggle="tab"]').on('show', function (e) {
+        e.target // activated tab
+        e.relatedTarget // previous tab
+        var table= $(e.target).data('table');
+        var url = "{% url 'json_table' %}";
+        $.get(url,{table:table},'application/json').done(render);
+    })
+
+
+    $('table[data-model] tbody').on('click','td',function(){
+
+        var cells=$(this).parents('tr[data-pk]').find('td')
+        cells.each(function(){
+            var cell=$(this);
+            var input = cell.find('input');
+            if (!input[0]) {
+                var val=cell.text()
+                var row = cell.parents('table[data-model]').find('tfoot [data-field="'+cell.data('field')+'"] input')
+                        .clone();
+                cell.html(row);
+                var input = cell.find('input');
+                input.val(val)
+            }
+        })
+
+    })
+
+
+    function send_row(cell){
+        var row=cell.parents('tr[data-pk]');
+        var table = cell.parents('table[data-model]');
+        var inputs = row.find('input');
+        data = {
+            pk:row.data('pk')
+        };
+        var error = false;
+        inputs.each(function(){
+            if (this.validity.valid ){
+                data[this.name]=this.value;
+            } else {
+                error = true;
+            }
+        });
+        if (! error)
+        $.ajax({
+            url:table.data('action'),
+            data:data,
+            context:cell,
+            type: "POST"
+        })
+                .done(function(data){
+                    render(data);
+                })
+                .fail(function(data){
+                    console.log(data)
+                });
+
+
+    }
+
+
+    $('table[data-model]').on('dblclick','input',function(){
+        send_row($(this));
+        return false;
+    });
+
+    $('table[data-model]').on('keypress','input',function(e){
+
+        if (e.which == 13) {
+            send_row($(this));
+            return false;
+        }
+    });
+
+    $('.tabbable a[data-table="{{table}}"]').tab('show');
+
+  })
+</script>
+</body>
+</html>
