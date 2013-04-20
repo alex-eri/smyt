@@ -1,5 +1,6 @@
 # Create your views here.
 from django.core import serializers
+from simplejson import dumps
 from django.views.generic.edit import BaseFormView, ModelFormMixin, ProcessFormView, BaseUpdateView
 from django.views.generic.list import BaseListView
 import models
@@ -33,9 +34,13 @@ class Table(BaseListView):
     def post(self,**kwargs):
         print kwargs
 
-class RowEdit(BaseUpdateView):
+class RowForm(BaseUpdateView):
     response_class = HttpResponse
     content_type = 'application/json'
+
+    def get_form_class(self):
+        table = self.kwargs.get('table') or self.request.GET.get('table') or None
+        return getattr(forms,table)
 
     def get_object(self, queryset=None):
         table = self.kwargs.get('table') or self.request.GET.get('table') or None
@@ -51,13 +56,17 @@ class RowEdit(BaseUpdateView):
     def form_valid(self, form):
         form.save()
         return self.render_to_response({})
+
     def form_invalid(self, form):
-        print form
-        return HttpResponseBadRequest('Bad Values')
+        self.response_class = HttpResponseBadRequest
+        return self.render_to_response(self.get_context_data(form=form))
 
     def render_to_response(self, context, **response_kwargs):
         response_kwargs.setdefault('content_type', self.content_type)
-        data = serializers.serialize('json', [self.object])
+        if 'form' in context:
+            data = dumps(context['form'].to_data())
+        else:
+            data = serializers.serialize('json', [self.object])
         return self.response_class(
             data,
             **response_kwargs
