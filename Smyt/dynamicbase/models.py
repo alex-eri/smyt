@@ -12,20 +12,23 @@ field_types = {
 tables = []
 
 
-def get_field(field):
+def setup_field(field):
     field_type = field.pop('type')
     field_class, field_kwargs = field_types[field_type]
     field_kwargs['verbose_name'] = field.pop('title',field_type)
     return field_class(**field_kwargs)
 
-
-def parse_models():
-    import yaml, glob, os, codecs
-
+def get_files():
+    import  glob, os
     path    = os.path.dirname(os.path.abspath(__file__))
     pattern = os.path.join(path, 'model/*.yaml')
+    return glob.glob(pattern)
+#    yield
 
-    for filename in glob.glob(pattern):
+def parse_models():
+    import yaml, codecs
+
+    for filename in get_files():
         with codecs.open(filename, 'r', encoding='utf-8') as f:
             y = yaml.safe_load(f)
             for k in y:
@@ -38,10 +41,11 @@ def parse_models():
                 attrs['Meta'] = type('Meta', (), {'verbose_name': title, 'verbose_name_plural': title})
 
                 for field in fields:
-                    attrs[field['id']] = get_field(field)
+                    attrs[field['id']] = setup_field(field)
 
                 globals()[k] = type(k, (models.Model,),attrs)
                 tables.append(k)
 
 
 parse_models()
+__all__ = tables
